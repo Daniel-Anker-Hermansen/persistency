@@ -3,7 +3,7 @@ use std::ptr::NonNull;
 use crate::{
 	link::{self, Link, Node as _},
 	util::alloc,
-	version::Version,
+	version::PartialVersion,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -56,7 +56,7 @@ unsafe impl<T: Clone> link::Node<Tag> for Node<T> {
 }
 
 impl<T: Ord + Clone> Node<T> {
-	pub fn insert(&mut self, value: T, version: Version) {
+	pub fn insert(&mut self, value: T, version: PartialVersion) {
 		if value < self.value {
 			match self.get(Tag::LeftChild, version) {
 				Some(mut left) => unsafe { left.as_mut() }.insert(value, version),
@@ -92,17 +92,17 @@ impl<T: Ord + Clone> Node<T> {
 		}
 	}
 
-	pub fn contains(&self, value: &T, version: Version) -> bool {
-		if value == &self.value {
-			true
-		} else if value < &self.value {
-			self.get(Tag::LeftChild, version)
+	pub fn contains(&self, value: &T, version: PartialVersion) -> bool {
+		match value.cmp(&self.value) {
+			std::cmp::Ordering::Less => self
+				.get(Tag::LeftChild, version)
 				.map(|left| unsafe { left.as_ref() }.contains(value, version))
-				.unwrap_or(false)
-		} else {
-			self.get(Tag::RightChild, version)
+				.unwrap_or(false),
+			std::cmp::Ordering::Equal => true,
+			std::cmp::Ordering::Greater => self
+				.get(Tag::RightChild, version)
 				.map(|right| unsafe { right.as_ref() }.contains(value, version))
-				.unwrap_or(false)
+				.unwrap_or(false),
 		}
 	}
 }

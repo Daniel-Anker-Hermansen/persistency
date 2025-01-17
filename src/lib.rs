@@ -121,11 +121,6 @@ fn get_new_version<T>(
 	unsafe { opt.as_ref() }.copy.unwrap_or(opt)
 }
 
-#[cfg(bench)]
-thread_local! {
-	pub static ALLOC_COUNTER: RefCell<usize> = RefCell::new(0);
-}
-
 impl<T> PersistentLinkedListInner<T> {
 	fn alloc(value: Rc<T>, version: usize) -> NonNull<PersistentLinkedListInner<T>> {
 		let ret = PersistentLinkedListInner {
@@ -135,8 +130,6 @@ impl<T> PersistentLinkedListInner<T> {
 			copy: None,
 		};
 		let b = Box::new(ret);
-		#[cfg(bench)]
-		ALLOC_COUNTER.with_borrow_mut(|v| *v += 1);
 		NonNull::from(Box::leak(b))
 	}
 

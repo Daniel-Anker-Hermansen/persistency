@@ -159,13 +159,65 @@ unsafe fn split_tail(
 /// the list.
 #[derive(Clone, Copy)]
 pub struct Version {
-	node: NonNull<VersionNode>,
+	pub primary: PartialVersion,
+	pub secondary: PartialVersion,
+}
+
+impl Default for Version {
+	fn default() -> Self {
+		Self::new()
+	}
 }
 
 impl Version {
+	pub fn new() -> Version {
+		let primary = PartialVersion::new();
+		let secondary = primary.insert_after();
+		Version { primary, secondary }
+	}
+
+	pub fn insert_after(self) -> Version {
+		let primary = self.primary.insert_after();
+		let secondary = primary.insert_after();
+		Version { primary, secondary }
+	}
+}
+
+impl PartialEq for Version {
+	fn eq(&self, other: &Self) -> bool {
+		self.primary.eq(&other.primary)
+	}
+}
+
+impl Eq for Version {}
+
+impl PartialOrd for Version {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		Some(self.cmp(other))
+	}
+}
+
+impl Ord for Version {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		self.primary.cmp(&other.primary)
+	}
+}
+
+#[derive(Clone, Copy)]
+pub struct PartialVersion {
+	node: NonNull<VersionNode>,
+}
+
+impl Default for PartialVersion {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
+impl PartialVersion {
 	/// Creates a new version and the associatied version list. Comparing this with version
 	/// from other version lists is meaningless.
-	pub fn new() -> Version {
+	pub fn new() -> PartialVersion {
 		let mut node = alloc(VersionNode {
 			parent: NonNull::dangling(),
 			next: None,
@@ -188,26 +240,11 @@ impl Version {
 		unsafe { super_node.as_mut() }.parent = list;
 		unsafe { super_node.as_mut() }.next = super_node;
 
-		Version { node }
-	}
-
-	/// Returns the next version. Returns None if this is the newest version.
-	pub fn next_version(self) -> Option<Version> {
-		unsafe {
-			node_next(self.node)
-				.map(|node| Version { node })
-				.or_else(|| {
-					let super_node = node_parent(self.node);
-					let next_super_node = super_node_next(super_node);
-					(!is_base(next_super_node)).then(|| Version {
-						node: super_node_list(next_super_node),
-					})
-				})
-		}
+		PartialVersion { node }
 	}
 
 	/// Inserts a new version directly after this version and returns it.
-	pub fn insert_after(mut self) -> Version {
+	fn insert_after(mut self) -> PartialVersion {
 		unsafe {
 			let next = node_next(self.node);
 			let prev_value = node_value(self.node);
@@ -233,7 +270,7 @@ impl Version {
 			let mut list = super_node_parent(parent);
 			list.as_mut().size += 1;
 
-			Version { node: new_version }
+			PartialVersion { node: new_version }
 		}
 	}
 
@@ -249,7 +286,7 @@ impl Version {
 	}
 }
 
-impl fmt::Debug for Version {
+impl fmt::Debug for PartialVersion {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		let (major, minor) = self.ordering_values();
 
@@ -260,21 +297,21 @@ impl fmt::Debug for Version {
 	}
 }
 
-impl PartialEq for Version {
+impl PartialEq for PartialVersion {
 	fn eq(&self, other: &Self) -> bool {
 		self.cmp(other).is_eq()
 	}
 }
 
-impl Eq for Version {}
+impl Eq for PartialVersion {}
 
-impl PartialOrd for Version {
+impl PartialOrd for PartialVersion {
 	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
 		Some(self.cmp(other))
 	}
 }
 
-impl Ord for Version {
+impl Ord for PartialVersion {
 	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
 		self.ordering_values().cmp(&other.ordering_values())
 	}
@@ -282,11 +319,11 @@ impl Ord for Version {
 
 #[cfg(test)]
 mod test {
-	use super::Version;
+	use super::PartialVersion;
 
 	#[test]
 	fn version_test() {
-		let mut version_list = vec![Version::new()];
+		let mut version_list = vec![PartialVersion::new()];
 		for _ in 0..10000 {
 			let i = fastrand::usize(..version_list.len());
 			let new_version = version_list[i].insert_after();
@@ -304,7 +341,7 @@ mod test {
 	#[test]
 	fn adversarial() {
 		let mut version_list = vec![];
-		let version = Version::new();
+		let version = PartialVersion::new();
 		for _ in 0..100000 {
 			version_list.push(version.insert_after());
 		}

@@ -1,13 +1,13 @@
 use core::ptr::NonNull;
 
-use crate::version::Version;
+use crate::version::PartialVersion;
 
 pub struct Link<Node, Tag>
 where
 	Node: ?Sized,
 {
 	tag: Tag,
-	version: Version,
+	version: PartialVersion,
 	node_pointer: NonNull<Node>,
 	link_pointer: NonNull<Link<Node, Tag>>,
 }
@@ -23,11 +23,11 @@ pub unsafe trait Node<Tag: PartialEq + Eq + Clone + LinkTag> {
 
 	fn copy_pointer(&self) -> Option<NonNull<Self>>;
 
-	fn current_version(&mut self, _version: Version) -> &mut Self {
+	fn current_version(&mut self, _version: PartialVersion) -> &mut Self {
 		self.copy_pointer().map(|mut pointer| unsafe { pointer.as_mut() }).unwrap_or(self)
 	}
 
-	fn copy_and_prepare(&mut self, version: Version) -> NonNull<Self> {
+	fn copy_and_prepare(&mut self, version: PartialVersion) -> NonNull<Self> {
 		let mut copy = self.copy();
 		let container = unsafe { copy.as_mut() }.link_container_mut();
 		let mut to_move = Vec::new();
@@ -71,7 +71,7 @@ pub unsafe trait Node<Tag: PartialEq + Eq + Clone + LinkTag> {
 		&mut self,
 		tag: Tag,
 		mut pointer: NonNull<Self>,
-		version: Version,
+		version: PartialVersion,
 		reverse: bool,
 	) -> (NonNull<Self>, NonNull<Link<Self, Tag>>) {
 		if let Some(free) = self
@@ -108,7 +108,7 @@ pub unsafe trait Node<Tag: PartialEq + Eq + Clone + LinkTag> {
 		}
 	}
 
-	fn get(&self, tag: Tag, version: Version) -> Option<NonNull<Self>> {
+	fn get(&self, tag: Tag, version: PartialVersion) -> Option<NonNull<Self>> {
 		self.link_container()
 			.iter()
 			.filter_map(Option::as_ref)

@@ -11,6 +11,12 @@ pub struct Vec<T: ?Sized> {
 	len: PersistentCell<usize>,
 }
 
+impl<T: ?Sized> Default for Vec<T> {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+
 impl<T: ?Sized> Vec<T> {
 	pub fn new() -> Vec<T> {
 		Vec {
@@ -65,9 +71,10 @@ impl<T> Index<usize> for VecView<'_, T> {
 		let len = self.inner.len(self.version);
 		if index >= len {
 			panic!("Index out of bounds. Index was {} len was {}", index, len);
-		}
-		else {
-			self.inner.vec[index].get(self.version).expect("must be initialized in this cell as the len is greater for this version")
+		} else {
+			self.inner.vec[index]
+				.get(self.version)
+				.expect("must be initialized in this cell as the len is greater for this version")
 		}
 	}
 }
